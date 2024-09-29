@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel - Manage Top Movies</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha3/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+</head>
+<body>
+    <div class="container mt-5">
+        <h2 class="text-center">Admin Panel - Manage Top Movies</h2>
+
+        <!-- Top Movie Upload Form -->
+        <form id="topMovieForm">
+            <div class="mb-3">
+                <label for="topMovieTitle" class="form-label">Movie Title</label>
+                <input type="text" class="form-control" id="topMovieTitle" placeholder="Enter movie title" required>
+            </div>
+            <div class="mb-3">
+                <label for="topImageUrl" class="form-label">Image URL</label>
+                <input type="url" class="form-control" id="topImageUrl" placeholder="Enter image URL" required>
+            </div>
+            <div class="mb-3">
+                <label for="topDownloadUrl" class="form-label">Download URL</label>
+                <input type="url" class="form-control" id="topDownloadUrl" placeholder="Enter download URL" required>
+            </div>
+            <input type="hidden" id="topMovieId">
+            <button type="submit" class="btn btn-primary" id="submitTopMovieButton">Upload Movie</button>
+            <button type="button" class="btn btn-secondary" id="resetTopMovieButton">Reset</button>
+        </form>
+
+        <h3 class="mt-5">Top Movies List</h3>
+        <table class="table table-bordered mt-3">
+            <thead>
+                <tr>
+                    <th>Title</th>
+                    <th>Image</th>
+                    <th>Download Link</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="topMoviesList">
+                <!-- Movie data will be dynamically injected here -->
+            </tbody>
+        </table>
+    </div>
+
+    <script type="module" >import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-app.js";
+    import { getDatabase, ref, push, onValue, update, remove } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-database.js";
+    
+    // Firebase configuration
+    const firebaseConfig = {
+    apiKey: "AIzaSyBsz-82MDaibWnIBUpoykrZHyJW7UMedX8",
+    authDomain: "movies-bee24.firebaseapp.com",
+    databaseURL: "https://movies-bee24-default-rtdb.firebaseio.com",
+    projectId: "movies-bee24",
+    storageBucket: "movies-bee24.appspot.com",
+    messagingSenderId: "1080659811750",
+    appId: "1:1080659811750:web:c1ef7d4dacc3ab17edc367"
+    };
+    
+    // Initialize Firebase
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+    
+    // Reference for top movies
+    const topMoviesRef = ref(db, 'top_movies');
+    
+    // Handle form submission for uploading or updating top movies
+    const topMovieForm = document.getElementById('topMovieForm');
+    const topMovieIdField = document.getElementById('topMovieId');
+    const submitTopMovieButton = document.getElementById('submitTopMovieButton');
+    const resetTopMovieButton = document.getElementById('resetTopMovieButton');
+    
+    // Upload or update top movie
+    topMovieForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    
+    const topMovieTitle = document.getElementById('topMovieTitle').value;
+    const topImageUrl = document.getElementById('topImageUrl').value;
+    const topDownloadUrl = document.getElementById('topDownloadUrl').value;
+    const topMovieId = topMovieIdField.value;
+    
+    if (topMovieId) {
+    // Update existing movie
+    const topMovieUpdateRef = ref(db, 'top_movies/' + topMovieId);
+    update(topMovieUpdateRef, {
+    title: topMovieTitle,
+    imageUrl: topImageUrl,
+    downloadUrl: topDownloadUrl
+    })
+    .then(() => {
+    alert('Top Movie updated successfully!');
+    resetTopMovieForm();
+    })
+    .catch((error) => {
+    console.error('Error updating movie:', error);
+    });
+    } else {
+    // Upload new movie
+    push(topMoviesRef, {
+    title: topMovieTitle,
+    imageUrl: topImageUrl,
+    downloadUrl: topDownloadUrl
+    })
+    .then(() => {
+    alert('Top Movie uploaded successfully!');
+    resetTopMovieForm();
+    })
+    .catch((error) => {
+    console.error('Error uploading movie:', error);
+    });
+    }
+    });
+    
+    // Reset form
+    resetTopMovieButton.addEventListener('click', resetTopMovieForm);
+    
+    function resetTopMovieForm() {
+    topMovieForm.reset();
+    topMovieIdField.value = '';
+    submitTopMovieButton.textContent = 'Upload Movie';
+    }
+    
+    // Fetch and display top movies
+    onValue(topMoviesRef, (snapshot) => {
+    const data = snapshot.val();
+    const topMoviesList = document.getElementById('topMoviesList');
+    topMoviesList.innerHTML = '';
+    
+    if (data) {
+    Object.keys(data).forEach((key) => {
+    const movie = data[key];
+    const movieRow = `
+    <tr>
+    <td>${movie.title}</td>
+    <td><img src="${movie.imageUrl}" alt="${movie.title}" style="width: 100px;"></td>
+    <td><a href="${movie.downloadUrl}" target="_blank">Download</a></td>
+    <td>
+    <button class="btn btn-warning" onclick="editTopMovie('${key}', '${movie.title}', '${movie.imageUrl}', '${movie.downloadUrl}')">Edit</button>
+    <button class="btn btn-danger" onclick="deleteTopMovie('${key}')">Delete</button>
+    </td>
+    </tr>
+    `;
+    topMoviesList.innerHTML += movieRow;
+    });
+    } else {
+    topMoviesList.innerHTML = '<tr><td colspan="4" class="text-center">No top movies found</td></tr>';
+    }
+    });
+    
+    // Edit movie
+    window.editTopMovie = (key, title, imageUrl, downloadUrl) => {
+    document.getElementById('topMovieTitle').value = title;
+    document.getElementById('topImageUrl').value = imageUrl;
+    document.getElementById('topDownloadUrl').value = downloadUrl;
+    topMovieIdField.value = key;
+    submitTopMovieButton.textContent = 'Update Movie';
+    };
+    
+    // Delete movie
+    window.deleteTopMovie = (key) => {
+    const topMovieDeleteRef = ref(db, 'top_movies/' + key);
+    remove(topMovieDeleteRef)
+    .then(() => {
+    alert('Top Movie deleted successfully!');
+    })
+    .catch((error) => {
+    console.error('Error deleting movie:', error);
+    });
+    };</script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
